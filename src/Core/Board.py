@@ -75,8 +75,8 @@ class Board:
                     file_index += 1
 
         self.occupied90 = BBU.rotate_mirrored90c(self.occupied)
-        self.occupied45R = BBU.rotate45_shift(self.occupied, 0)
-        self.occupied45L = BBU.rotate45_shift(self.occupied, 0, is_right=False)                    
+        # self.occupied45R = BBU.rotate45_shift(self.occupied, 0)
+        # self.occupied45L = BBU.rotate45_shift(self.occupied, 0, is_right=False)                    
     
     #def getCurrentFEN(self):
                     

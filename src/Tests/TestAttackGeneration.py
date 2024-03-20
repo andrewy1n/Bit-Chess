@@ -1,11 +1,11 @@
 import unittest
 from src.Core.Board import Board
-from src.Core.MoveGeneration import MoveGeneration
+from src.Core.AttackGeneration import AttackGeneration
 from src.Core import BitboardUtility as BBU  
 import numpy as np
 
 board = Board()
-move_generator = MoveGeneration(board)
+attack_generator = AttackGeneration()
 
 class TestAttackGeneration(unittest.TestCase):
    # Test knight moves on D4
@@ -15,7 +15,7 @@ class TestAttackGeneration(unittest.TestCase):
       BBU.printBB(available_moves)
       print()
 
-      knight_moves = move_generator.knight_attacks[3][3]
+      knight_moves = attack_generator.knight_attacks[3][3]
 
       BBU.printBB(knight_moves)
       print()
@@ -29,7 +29,7 @@ class TestAttackGeneration(unittest.TestCase):
       BBU.printBB(available_moves)
       print()
 
-      king_moves = move_generator.king_moves[3][3]
+      king_moves = attack_generator.king_moves[3][3]
 
       BBU.printBB(king_moves)
       print()
@@ -47,7 +47,7 @@ class TestAttackGeneration(unittest.TestCase):
       BBU.printBB(rank_moves)
       print()
 
-      move_gen_rank_moves = move_generator.rank_attacks[3][3][sample_blockers >> np.uint64(24) & np.uint64(255)]
+      move_gen_rank_moves = attack_generator.rank_attacks[3][3][sample_blockers >> np.uint64(24) & np.uint64(255)]
       BBU.printBB(move_gen_rank_moves)
       
       self.assertEqual(rank_moves, move_gen_rank_moves)
@@ -62,7 +62,7 @@ class TestAttackGeneration(unittest.TestCase):
       BBU.printBB(file_moves)
       print()
 
-      move_gen_file_moves = move_generator.file_attacks[3][3][BBU.rotate_mirrored90c(sample_blockers) >> np.uint64(24) & np.uint64(255)]
+      move_gen_file_moves = attack_generator.file_attacks[3][3][BBU.rotate_mirrored90c(sample_blockers) >> np.uint64(24) & np.uint64(255)]
       BBU.printBB(move_gen_file_moves)
       
       self.assertEqual(file_moves, move_gen_file_moves)
@@ -77,8 +77,8 @@ class TestAttackGeneration(unittest.TestCase):
       BBU.printBB(valid_moves)
       print()
 
-      rank_moves = move_generator.rank_attacks[7][3][sample_blockers >> np.uint64(24) & np.uint64(255)]
-      file_moves = move_generator.file_attacks[7][3][BBU.rotate_mirrored90c(sample_blockers) >> np.uint64(56) & np.uint64(255)]
+      rank_moves = attack_generator.rank_attacks[7][3][sample_blockers >> np.uint64(24) & np.uint64(255)]
+      file_moves = attack_generator.file_attacks[7][3][BBU.rotate_mirrored90c(sample_blockers) >> np.uint64(56) & np.uint64(255)]
       BBU.printBB(rank_moves | file_moves)
 
       self.assertEqual(rank_moves | file_moves, valid_moves)
@@ -92,7 +92,7 @@ class TestAttackGeneration(unittest.TestCase):
       BBU.printBB(moves)
       print()
 
-      moves_generated = move_generator.generate_diagonal_moves(3, 3, sample_blockers)
+      moves_generated = attack_generator.generate_diagonal_moves(3, 3, sample_blockers)
       BBU.printBB(moves_generated)
       print()
 
@@ -107,7 +107,7 @@ class TestAttackGeneration(unittest.TestCase):
       BBU.printBB(moves)
       print()
 
-      moves_generated = move_generator.diagR_attacks[3][3][BBU.rotate45_shift(sample_blockers, 28) & np.uint64(255)]
+      moves_generated = attack_generator.diagR_attacks[3][3][BBU.rotate45_shift(sample_blockers, 28) & np.uint64(255)]
 
       BBU.printBB(moves_generated)
       print()
@@ -124,13 +124,16 @@ class TestAttackGeneration(unittest.TestCase):
       BBU.printBB(moves)
       print()
 
-      right_diagonal = move_generator.diagR_attacks[2][4][BBU.rotate45_shift(sample_blockers, 43) & np.uint64(255)]
-      left_diagonal = move_generator.diagL_attacks[2][4][BBU.rotate45_shift(sample_blockers, 36, is_right=False) & np.uint64(127)]
+      right_diagonal = attack_generator.diagR_attacks[2][4][BBU.rotate45_shift(sample_blockers, 43) & np.uint64(255)]
+      left_diagonal = attack_generator.diagL_attacks[2][4][BBU.rotate45_shift(sample_blockers, 36, is_right=False) & np.uint64(127)]
 
       BBU.printBB(right_diagonal | left_diagonal)
       print()
 
       self.assertEqual(right_diagonal | left_diagonal, moves)
+   
+   def test_attack_map(self):
+      BBU.printBB(attack_generator.generate_attack_map(board))
 
 
 if __name__ == '__main__':
