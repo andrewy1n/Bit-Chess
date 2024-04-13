@@ -7,19 +7,6 @@ FILES = np.array(
     [np.uint64(0x0101010101010101) << np.uint8(i) for i in range(8)],
     dtype=np.uint64)
 
-def pop_LSB(bb):
-    if bb == 0:
-        return -1  # No set bits found
-    
-    position = 0
-    # Use bitwise AND to check the rightmost set bit
-    position = bb & -bb
-    
-    # Count trailing zeros (position of the rightmost set bit)
-    position = bin(position).count('0') - 1
-    
-    return position
-
 def set_square(bb, index: int) -> None:
     return bb | np.uint64(1) << np.uint64(index)   
 
@@ -29,6 +16,39 @@ def set_square_notation(bb, notation_list: list):
     for rank, file in notation_list:
         bb = set_square(bb, ranks.index(rank) + (file-1)*8)
     return bb
+
+WHITE_KINGSIDE_MASK = set_square_notation(np.uint64(0), [('f', 1), ('g', 1)])
+BLACK_KINGSIDE_MASK = set_square_notation(np.uint64(0), [('f', 8), ('g', 8)])
+
+WHITE_QUEENSIDE_MASK_2 = set_square_notation(np.uint64(0), [('d', 1), ('c', 1)])
+BLACK_QUEENSIDE_MASK_2 = set_square_notation(np.uint64(0), [('d', 8), ('c', 8)])
+
+WHITE_QUEENSIDE_MASK = set_square_notation(WHITE_QUEENSIDE_MASK_2, [('b', 1)])
+BLACK_QUEENSIDE_MASK = set_square_notation(BLACK_QUEENSIDE_MASK_2, [('b', 8)])
+
+INDEX64 = [
+    0,  1, 48,  2, 57, 49, 28,  3,
+   61, 58, 50, 42, 38, 29, 17,  4,
+   62, 55, 59, 36, 53, 51, 43, 22,
+   45, 39, 33, 30, 24, 18, 12,  5,
+   63, 47, 56, 27, 60, 41, 37, 16,
+   54, 35, 52, 21, 44, 32, 23, 11,
+   46, 26, 40, 15, 34, 20, 31, 10,
+   25, 14, 19,  9, 13,  8,  7,  6
+]
+    
+DEBRUIJN64 = np.uint64(0x03f79d71b4cb0a89)
+
+# Uses De Bruijn bitscan
+def popLSB(bb: np.uint64):
+    if bb == 0:
+        return -1 # No bits found
+    
+    i = int((bb & -bb) * DEBRUIJN64 >> np.uint64(58))
+
+    bb &= (bb - np.uint64(1))
+
+    return bb, INDEX64[i]
 
 def contains_square(bb, sq: int) -> bool:
     return bb >> np.uint64(sq) & np.uint64(1) != 0
@@ -61,15 +81,15 @@ def rotate90cc(bb) -> np.uint64:
 def rotate_mirrored90c(bb) -> np.uint64:
     bin_rep = uint_to_rep(bb)
 
-    # Rotate array 90 degrees 3 times (essentially rotate clockwise)
-    rotated_arr = np.rot90(bin_rep, 3)
+    # Rotate array 90 degrees -1 times (essentially rotate clockwise)
+    rotated_arr = np.rot90(bin_rep, -1)
 
     # Flip array upside down
     rotated_arr = np.flipud(rotated_arr)
 
     return rep_to_uint(rotated_arr)
 
-def rotate45_shift(bb, shift, is_right=True) -> np.uint64:
+def rotate45(bb, is_right=True) -> np.uint64:
     bin_rep = uint_to_rep(bb)
 
     # Map diagonal bits of array to new bitboard
@@ -77,57 +97,13 @@ def rotate45_shift(bb, shift, is_right=True) -> np.uint64:
     
     # Iterate through each diagonal, concatenate to new array
     for offset in range(-7, 8):       
-        diag = np.diagonal(np.flipud(bin_rep), offset) if is_right else np.diagonal(bin_rep, offset)
+        diag = np.diagonal(np.flipud(bin_rep), offset)[::-1] if is_right else np.diagonal(bin_rep, offset)[::-1]
         mapped_array = np.concatenate((mapped_array, diag))
     
-    mapped_array = np.roll(mapped_array, -shift)
-    
-    return rep_to_uint(mapped_array)
+    # Convert the flattened array to uint64
+    bb = np.packbits(mapped_array, axis=None, bitorder='little')
 
-def rotate45L_shift(bb) -> np.uint64:
-    # Convert bitboard to binary representation
-    bin_rep = np.binary_repr(bb, width=64)
-
-    # Reshape to 8 x 8 array
-    bb_arr = np.array(list(bin_rep)).astype(int).reshape(8, 8)[::-1]
-
-    # Map diagonal bits of array to new bitboard
-    mapped_array = np.array([], dtype=int)
-    
-    # Iterate through each diagonal, concatenate to new array
-    for offset in range(7, -8, -1):
-        diag = np.flipud(bb_arr).diagonal(offset=offset)
-        mapped_array = np.concatenate((mapped_array, diag))
-    
-    flattened_array = mapped_array.flatten()
-    
-    rotated_bb = np.packbits(flattened_array)
-    
-    return rotated_bb.view(np.uint64)
-
-def undo45(bb):
-    # Convert bitboard to binary representation
-    bin_rep = np.unpackbits(np.array([bb], dtype=np.uint64).view(np.uint8))
-    
-    # Initialize the 8x8 matrix with zeros
-    matrix = np.zeros((8, 8), dtype=np.uint64)
-    
-    # Fill the diagonals
-    bit_count = 0
-    for i in range(8):
-        diagonal_data = np.array([int(bit) for bit in bin_rep[bit_count:bit_count + i + 1]])
-        print(diagonal_data)
-        np.fill_diagonal(np.flipud(matrix[:i+1, :i+1]), diagonal_data)
-        bit_count += i + 1
-    
-    # Fill the diagonals in reverse order
-    for i in range(1, 8):
-        diagonal_data = np.array([int(bit) for bit in bin_rep[bit_count:bit_count + 8 - i]])
-        print(diagonal_data)
-        np.fill_diagonal(np.flipud(matrix[i:, i:]), diagonal_data)
-        bit_count += 8 - i
-    
-    return rep_to_uint(matrix)
+    return bb.view(np.uint64)
 
 def printBB(bb):
     board = np.unpackbits(np.array([bb], dtype=np.uint64).view(np.uint8))

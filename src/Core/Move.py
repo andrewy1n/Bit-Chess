@@ -1,12 +1,8 @@
 class Move:
-    def __init__(self, start_square, target_square) -> None:
-        self.start_square = start_square
-        self.start_pos = (start_square.file, start_square.rank)
-        self.target_square = target_square
-        self.target_pos = (target_square.file, target_square.rank)
-        self.start_piece = start_square.occupying_piece
-        self.target_piece = target_square.occupying_piece
-
+    def __init__(self, start_index, target_index) -> None:
+        self.start_index = start_index
+        self.target_index = target_index
+        
         #Set to True if a pawn moves up two spaces
         self.enpassant_flag = False 
         self.is_enpassant = False

@@ -1,10 +1,11 @@
 import numpy as np
+import math
 from src.Core import BitboardUtility as BBU
 
 '''
-Generates Attacks for Opposing Players
+Generates Precomputed Attacks for Opposing Players
 '''
-class AttackGeneration:
+class PrecomputedAttacks:
     def __init__(self) -> None:
         self.cardinals = [(-1, 0), (0, 1), (1, 0), (0, -1)]
         self.ordinals = [(-1, -1), (-1, 1), (1, 1), (1, -1)]
@@ -14,23 +15,28 @@ class AttackGeneration:
         self.diag_lengths = [1, 2, 3, 4, 5, 6, 7, 8, 7, 6, 5, 4, 3, 2, 1]
         
         # Will be initialized beforehand
-        self.knight_attacks = np.zeros((8, 8), dtype=np.uint64)
-        self.white_pawn_attacks = np.zeros((8, 8), dtype=np.uint64)
-        self.black_pawn_attacks = np.zeros((8, 8), dtype=np.uint64)
-        self.king_moves = np.zeros((8, 8), dtype=np.uint64)
+        self.knight_attacks = np.zeros(64, dtype=np.uint64)
+        self.white_pawn_attacks = np.zeros(64, dtype=np.uint64)
+        self.black_pawn_attacks = np.zeros(64, dtype=np.uint64)
+        self.king_moves = np.zeros(64, dtype=np.uint64)
 
-        self.rank_attacks = np.zeros((8, 8, 256), dtype=np.uint64)
-        self.file_attacks = np.zeros((8, 8, 256), dtype=np.uint64)
+        self.rank_attacks = np.zeros((64, 256), dtype=np.uint64)
+        self.file_attacks = np.zeros((64, 256), dtype=np.uint64)
 
-        self.diagR_attacks = np.zeros((8, 8, 256), dtype=np.uint64)
-        self.diagL_attacks = np.zeros((8, 8, 256), dtype=np.uint64)
+        self.diagR_attacks = np.zeros((64, 256), dtype=np.uint64)
+        self.diagL_attacks = np.zeros((64, 256), dtype=np.uint64)
+
+        self.align_mask = np.zeros((64, 64), dtype=np.uint64)
 
         for x in range(8):
             for y in range(8):
                 self.process_square(x, y)
+        
+        self.generate_align_mask()
 
     def process_square(self, x: int, y: int):
         # King Attacks
+        index = self.calculate_index(x, y)
         for i in range(4):
             card_x = x + self.cardinals[i][0]
             card_y = y + self.cardinals[i][1]
@@ -39,11 +45,11 @@ class AttackGeneration:
 
             if self.valid_square_index(card_x, card_y):
                 card_target_index = self.calculate_index(card_x, card_y)
-                self.king_moves[x][y] |= np.uint64(1) << card_target_index
+                self.king_moves[index] = BBU.set_square(self.king_moves[index], card_target_index)
             
             if self.valid_square_index(diag_x, diag_y):
                 diag_target_index = self.calculate_index(diag_x, diag_y)
-                self.king_moves[x][y] |= np.uint64(1) << diag_target_index
+                self.king_moves[index] = BBU.set_square(self.king_moves[index], diag_target_index)
         
         # Knight Attacks
         for dx, dy in self.knight_jumps:
@@ -52,32 +58,35 @@ class AttackGeneration:
 
             if self.valid_square_index(knight_x, knight_y):
                 knight_target_index = self.calculate_index(knight_x, knight_y)
-                self.knight_attacks[x][y] |= np.uint64(1) << knight_target_index
+                self.knight_attacks[index] = BBU.set_square(self.knight_attacks[index], knight_target_index)
         
         # Pawn Attacks
         if self.valid_square_index(x+1, y+1):
             white_pawn_right = self.calculate_index(x+1, y+1)
-            self.white_pawn_attacks[x][y] |= np.uint64(1) << white_pawn_right
+            self.white_pawn_attacks[index] = BBU.set_square(self.white_pawn_attacks[index], white_pawn_right)
             
         if self.valid_square_index(x-1, y+1):
             white_pawn_left = self.calculate_index(x-1, y+1)
-            self.white_pawn_attacks[x][y] |= np.uint64(1) << white_pawn_left
+            self.white_pawn_attacks[index] = BBU.set_square(self.white_pawn_attacks[index], white_pawn_left)
         
         if self.valid_square_index(x+1, y-1):
             black_pawn_right = self.calculate_index(x+1, y-1)
-            self.black_pawn_attacks[x][y] |= np.uint64(1) << black_pawn_right
+            self.black_pawn_attacks[index] = BBU.set_square(self.black_pawn_attacks[index], black_pawn_right)
         
         if self.valid_square_index(x-1, y-1):
             black_pawn_left = self.calculate_index(x-1, y-1)
-            self.black_pawn_attacks[x][y] = np.uint64(1) << black_pawn_left
+            self.black_pawn_attacks[index] = BBU.set_square(self.black_pawn_attacks[index], black_pawn_left)
         
         self.generate_ortho_attacks(x, y)
         self.generate_diagonal_attacks(x, y)
     
     # Generates all Orthogonal Attacks(Rank and File Attacks)
     def generate_ortho_attacks(self, x: int, y: int):
-        rank_arr = self.rank_attacks[x][y]
-        file_arr = self.file_attacks[y][x]
+        rank_index = self.calculate_index(x, y)
+        file_index = self.calculate_index(y, x)
+        
+        rank_arr = self.rank_attacks[rank_index]
+        file_arr = self.file_attacks[file_index]
 
         # Create all possible blocker configurations
         def generate_blockers(cur_file, blockers):
@@ -90,15 +99,18 @@ class AttackGeneration:
 
             for file in range(cur_file, 8):
                 # i cannot already be in blockers, and cannot be the same x position of the piece
-                if not BBU.contains_square(blockers, file) and file != x:
+                if not BBU.contains_square(blockers, file):
                     generate_blockers(file, BBU.set_square(blockers, file))
         
-        generate_blockers(0, np.uint64(0))
+        generate_blockers(0, BBU.set_square(np.uint64(0), x))
 
     # Generates all diagonal attacks (Bishops and Queens)
     def generate_diagonal_attacks(self, x: int, y: int):
-        diagR_arr = self.diagR_attacks[x][y]
-        diagL_arr = self.diagL_attacks[7-y][x]
+        diagR_index = self.calculate_index(x, y)
+        diagL_index = self.calculate_index(7-y, x)
+
+        diagR_arr = self.diagR_attacks[diagR_index]
+        diagL_arr = self.diagL_attacks[diagL_index]
         
         # Create all possible blocker configurations on the diagonal
         def generate_blockers(cur_step, blockers):
@@ -106,8 +118,8 @@ class AttackGeneration:
             normalized_bb = self.generate_diagonal_moves(x, y, blockers)
 
             # Calculate relative indices for left and right attacks, using 45 degree board rotations and shifts
-            right_arr_index = BBU.rotate45_shift(blockers, self.diag_to_shift[7-x+y])
-            left_arr_index = BBU.rotate45_shift(BBU.rotate90cc(blockers), self.diag_to_shift[7-x+y], is_right=False)
+            right_arr_index = BBU.rotate45(blockers) >> self.diag_to_shift[7-x+y]
+            left_arr_index = BBU.rotate45(BBU.rotate90cc(blockers), is_right=False) >> self.diag_to_shift[7-x+y]
 
             # Set index of diagonal array to relative diagonal moves
             diagR_arr[right_arr_index] = normalized_bb
@@ -115,16 +127,16 @@ class AttackGeneration:
 
             # Iterate through current step, up to 8 (this is overcounting)
             for step in range(cur_step, 8):
-                # Generate new possible index
-                index = self.calculate_index(x + step, y + step)
                 # Index must be valid, cannot already contain a piece, and cannot be the same index as the current piece
-                if self.valid_square_index(x + step, y + step) and \
-                    not BBU.contains_square(blockers, index) and \
-                        index != self.calculate_index(x, y):
+                if self.valid_square_index(x + step, y + step):
+                    # Generate new possible index
+                    index = self.calculate_index(x + step, y + step)
+                    
+                    if not BBU.contains_square(blockers, index):
                     # Recurse with new step and new index
-                    generate_blockers(step, BBU.set_square(blockers, index))
+                        generate_blockers(step, BBU.set_square(blockers, index))
         
-        generate_blockers(-min(x, y), np.uint64(0))
+        generate_blockers(-min(x, y), BBU.set_square(np.uint64(0), diagR_index))
 
     # Generates moves as bitboard of left and right attacks
     def generate_slider_moves(self, x: int, y: int, blockers: np.uint64):
@@ -132,8 +144,8 @@ class AttackGeneration:
         # Moves right of piece
         right_bound = 8-x
         for dx in range(1, right_bound):
-            index = self.calculate_index(x + dx, y)
             if self.valid_square_index(x + dx, y):
+                index = self.calculate_index(x + dx, y)
                 # Include first blocker as possible capture
                 if BBU.contains_square(blockers, index):
                     moves_bb = BBU.set_square(moves_bb, index)
@@ -143,8 +155,8 @@ class AttackGeneration:
         
         # Moves left of piece
         for dx in range(1, x+1):
-            index = self.calculate_index(x - dx, y)
             if self.valid_square_index(x - dx, y):
+                index = self.calculate_index(x - dx, y)
                 if BBU.contains_square(blockers, index):
                     moves_bb = BBU.set_square(moves_bb, index)
                     break
@@ -160,8 +172,8 @@ class AttackGeneration:
         # Moves right of piece
         right_bound = 8-x
         for step in range(1, right_bound):
-            index = self.calculate_index(x + step, y + step)
             if self.valid_square_index(x + step, y + step):
+                index = self.calculate_index(x + step, y + step)
                 # Include first blocker as possible capture
                 if BBU.contains_square(blockers, index):
                     moves_bb = BBU.set_square(moves_bb, index)
@@ -171,8 +183,8 @@ class AttackGeneration:
         
         # Moves left of piece
         for step in range(1, x+1):
-            index = self.calculate_index(x - step, y - step)
             if self.valid_square_index(x - step, y - step):
+                index = self.calculate_index(x - step, y - step)
                 if BBU.contains_square(blockers, index):
                     moves_bb = BBU.set_square(moves_bb, index)
                     break
@@ -181,65 +193,42 @@ class AttackGeneration:
         
         return moves_bb
     
-    def generate_pawn_attacks(self, color, pawn_map):
+    def generate_align_mask(self):
+        for start_index in range(64):
+            for end_index in range(64):
+                start_x, end_x = start_index % 8, end_index % 8
+                start_y, end_y = start_index // 8, end_index // 8
+                delta_x, delta_y = end_x - start_x, end_y - start_y
+                dir_x = int(math.copysign(1, delta_x)) if delta_x != 0 else 0
+                dir_y = int(math.copysign(1, delta_y)) if delta_y != 0 else 0
+                
+                if start_index == 3 and end_index == 19:
+                    print(dir_x, dir_y)
+                
+                for i in range(-8, 8):
+                    x = start_x + i * dir_x
+                    y = start_y + i * dir_y
+                    if self.valid_square_index(x, y):
+                        self.align_mask[start_index][end_index] |= np.uint64(1) << np.uint64(self.calculate_index(x, y))
+
+
+    def generate_pawn_attacks_left(self, color, pawn_map):
         if color == 'w':
-            return (pawn_map << np.uint64(9)) & ~BBU.FILES[0] | (pawn_map << np.uint64(7)) & ~BBU.FILES[7]
+            return (pawn_map << np.uint64(9)) & ~BBU.FILES[0]
         else:
-            return (pawn_map >> np.uint64(7)) & ~BBU.FILES[0] | (pawn_map >> np.uint64(9)) & ~BBU.FILES[7]
+            return (pawn_map >> np.uint64(7)) & ~BBU.FILES[0] 
     
+    def generate_pawn_attacks_right(self, color, pawn_map):
+        if color == 'w':
+            return (pawn_map << np.uint64(7)) & ~BBU.FILES[7]
+        else:
+            return (pawn_map >> np.uint64(9)) & ~BBU.FILES[7]
+    
+    def generate_pawn_attatcks(self, color, pawn_map):
+        return self.generate_pawn_attacks_left(color, pawn_map) | self.generate_pawn_attacks_right(color, pawn_map)
+
     def valid_square_index(self, x, y):
         return x >= 0 and x < 8 and y >= 0 and y < 8
     
     def calculate_index(self, x, y):
-        return np.uint64(y * 8 + x)
-    
-    def generate_attack_map(self, board):
-        piece_map = board.white_pieces if board.turn == 'b' else board.black_pieces
-        attack_map = np.uint64(0)
-
-        for x in range(8):
-            for y in range(8):
-                square = self.calculate_index(x, y)
-                if BBU.contains_square(piece_map, square):
-                    attack_map |= self.add_attack_map(board, x, y)
-        
-        return attack_map
-
-    def add_attack_map(self, board, x, y):
-        square = self.calculate_index(x, y)
-        for piece, bitboard in board.bitboard_dict.items():
-            if (board.turn == 'w' and piece.isupper()) or (board.turn == 'b' and piece.islower()) \
-                and BBU.contains_square(bitboard, square):
-                return self.add_piece_attack(board, piece, x, y)
-    
-    def add_piece_attack(self, board, piece, x, y):
-        attacks = np.uint64(0)
-        mask = ~(np.uint64(1) << self.calculate_index(x, y)) # Turns current piece bit to 0
-        
-        if piece == 'p':
-            attacks = self.black_pawn_attacks[x][y]
-        elif piece == 'P':
-            attacks = self.white_pawn_attacks[x][y]
-        elif piece.lower() == 'n':
-            attacks = self.knight_attacks[x][y]
-        elif piece.lower() == 'k':
-            attacks = self.king_moves[x][y]
-        elif piece.lower() == 'r':
-            rank_attacks = self.rank_attacks[x][y][board.occupied & mask >> np.uint64(y*8) & np.uint64(255)]
-            file_attacks = self.file_attacks[x][y][board.occupied90 & mask >> np.uint64(y*8) & np.uint64(255)]
-            attacks = rank_attacks | file_attacks
-        elif piece.lower() == 'b':
-            right_diagonal_attacks = self.diagR_attacks[x][y][BBU.rotate45_shift(board.occupied & mask, self.diag_to_shift[7-x+y]) & np.uint64(2**(self.diag_lengths[x+y])-1)]
-            left_diagonal_attacks = self.diagL_attacks[x][y][BBU.rotate45_shift(board.occupied & mask, self.diag_to_shift[7-x+y], is_right=False) & np.uint64(2**(self.diag_lengths[7-x+y])-1)]
-            attacks = right_diagonal_attacks | left_diagonal_attacks
-        elif piece.lower() == 'q': 
-            rank_attacks = self.rank_attacks[x][y][board.occupied & mask >> np.uint64(y*8) & np.uint64(255)]
-            file_attacks = self.file_attacks[x][y][board.occupied90 & mask>> np.uint64(y*8) & np.uint64(255)]
-            right_diagonal_attacks = self.diagR_attacks[x][y][BBU.rotate45_shift(board.occupied & mask, self.diag_to_shift[7-x+y]) & np.uint64(2**(self.diag_lengths[x+y])-1)]
-            left_diagonal_attacks = self.diagL_attacks[x][y][BBU.rotate45_shift(board.occupied & mask, self.diag_to_shift[7-x+y], is_right=False) & np.uint64(2**(self.diag_lengths[7-x+y])-1)]
-            attacks = rank_attacks | file_attacks | right_diagonal_attacks | left_diagonal_attacks
-        
-        # XOR same color occupied at end, remove attacks that attack your own pieces
-        ally_pieces = board.white_pieces if board.turn == 'b' else board.black_pieces
-
-        return attacks
+        return y * 8 + x

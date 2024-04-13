@@ -1,6 +1,8 @@
 from src.Core import BitboardUtility as BBU
 from src.Core.Move import Move
 from src.Core.GameState import GameState
+from src.Core.PieceList import PieceList
+from src.Core.PrecomputedAttacks import PrecomputedAttacks
 import numpy as np
 
 class Board:
@@ -11,6 +13,7 @@ class Board:
         self.turn = 'w'
         self.full_moves = 1
         self.half_moves = 0
+        self.piece_list = PieceList()
         
         # Uppercase notation -> White piece, lowercase -> black piece
         self.bitboard_dict = {
@@ -40,12 +43,19 @@ class Board:
         self.load_FEN_position(FEN_string)
         
     def load_FEN_position(self, fen: str):
-        pos, turn, castling_rights, enpassant_pos, *move_info = fen.split()
+        pos, turn, castling_rights, enpassant_str, *move_info = fen.split()
 
         self.turn = turn
         self.half_moves = int(move_info[0]) if move_info else 0
         self.full_moves = int(move_info[1]) if move_info else 1
-
+        
+        if enpassant_str != '-':
+            enpassant_rank = 'abcdefgh'.index(enpassant_str[0])
+            enpassant_file = int(enpassant_str[1]) - 1
+            enpassant_pos = [enpassant_rank, enpassant_file]
+        else:
+            enpassant_pos = None
+            
         self.current_game_state = GameState(enpassant_pos, castling_rights, self.half_moves)
 
         file_index, rank_index = 0, 7
@@ -70,13 +80,15 @@ class Board:
                     else:
                         self.black_pieces |= square
                     
+                    self.piece_list.add_piece(c, (file_index, rank_index))
+                    
                     self.occupied |= square
 
                     file_index += 1
 
         self.occupied90 = BBU.rotate_mirrored90c(self.occupied)
-        # self.occupied45R = BBU.rotate45_shift(self.occupied, 0)
-        # self.occupied45L = BBU.rotate45_shift(self.occupied, 0, is_right=False)                    
+        self.occupied45R = BBU.rotate45(self.occupied)
+        self.occupied45L = BBU.rotate45(self.occupied, is_right=False)                    
     
     #def getCurrentFEN(self):
                     

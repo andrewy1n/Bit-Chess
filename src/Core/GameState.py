@@ -3,3 +3,15 @@ class GameState:
         self.enpassant_pos = enpassant_pos
         self.castling_rights = castling_rights
         self.half_move_counter = half_move_counter
+    
+    def has_king_side_castling(self, turn):
+        if turn == 'w':
+            return 'K' in self.castling_rights
+        else:
+            return 'k' in self.castling_rights
+    
+    def has_queen_side_castling(self, turn):
+        if turn == 'w':
+            return 'Q' in self.castling_rights
+        else:
+            return 'q' in self.castling_rights
