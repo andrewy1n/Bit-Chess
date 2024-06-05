@@ -1,4 +1,5 @@
 import numpy as np
+import gmpy2
 
 RANKS = np.array(
     [np.uint64(0x00000000000000FF) << np.uint8(8*i) for i in range(8)],
@@ -39,8 +40,15 @@ INDEX64 = [
     
 DEBRUIJN64 = np.uint64(0x03f79d71b4cb0a89)
 
+def popLSB(bb: np.uint64) -> tuple[np.uint64, int]:
+    if bb == 0:
+        return -1
+    
+    lsb = gmpy2.bit_scan1(int(bb))
+    return np.uint64(gmpy2.bit_clear(int(bb), lsb)), lsb
+
 # Uses De Bruijn bitscan
-def popLSB(bb: np.uint64):
+'''def popLSB(bb: np.uint64):
     if bb == 0:
         return -1 # No bits found
     
@@ -48,10 +56,17 @@ def popLSB(bb: np.uint64):
 
     bb &= (bb - np.uint64(1))
 
-    return bb, INDEX64[i]
+    return bb, INDEX64[i]'''
 
 def contains_square(bb, sq: int) -> bool:
     return bb >> np.uint64(sq) & np.uint64(1) != 0
+
+def move_bit(bb: np.uint64, start_index: int, target_index: int):
+    move_mask =  np.uint64(1) << np.uint64(start_index) | np.uint64(1) << np.uint64(target_index)
+    return bb ^ move_mask  
+
+def delete_bit(bb: np.uint64, index: int):
+    return bb ^ np.uint64(1) << np.uint64(index)
 
 def uint_to_rep(bb: np.uint64):
     # Convert bitboard to binary representation

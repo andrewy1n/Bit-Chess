@@ -1,6 +1,6 @@
 class GameState:
-    def __init__(self, enpassant_pos, castling_rights, half_move_counter) -> None:
-        self.enpassant_pos = enpassant_pos
+    def __init__(self, enpassant_index, castling_rights, half_move_counter) -> None:
+        self.enpassant_index = enpassant_index
         self.castling_rights = castling_rights
         self.half_move_counter = half_move_counter
     

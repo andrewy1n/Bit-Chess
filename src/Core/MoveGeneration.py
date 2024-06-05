@@ -25,13 +25,13 @@ class MoveGeneration:
         self.enemy_pieces_bb = self.board.white_pieces if self.board.turn == 'b' else self.board.black_pieces
 
         self.ally_king_bb = self.board.bitboard_dict['K'] if self.board.turn == 'w' else self.board.bitboard_dict['k']
-        self.ally_king_pos = self.board.piece_list.white_king_pos if self.board.turn == 'w' else self.board.piece_list.black_king_pos
-        self.ally_king_index = self.calculate_index(self.ally_king_pos[0], self.ally_king_pos[1])
+        self.ally_king_index = self.board.piece_list.white_king_index if self.board.turn == 'w' else self.board.piece_list.black_king_index
+        self.ally_king_pos = (self.ally_king_index % 8, self.ally_king_index // 8) 
 
         self.iterate_opposing_attacks()
 
     # Generates a list of object Moves
-    def generate_moves(self, board) -> list:
+    def generate_moves(self, board) -> list[Move]:
         moves = []
 
         self.__init__(board, self.attack_data)
@@ -45,10 +45,11 @@ class MoveGeneration:
             # Generate Knight Moves
             self.generate_knight_moves(moves)
             # Generate Pawn Moves
-
+            self.generate_pawn_moves(moves)
+            
         return moves
     
-    def generate_king_moves(self, moves: list):
+    def generate_king_moves(self, moves: list[Move]) -> None:
         legal_mask =  ~(self.enemy_attack_map | self.ally_pieces_bb)
         king_moves = self.attack_data.king_moves[self.ally_king_index] & legal_mask
         
@@ -76,7 +77,7 @@ class MoveGeneration:
                     move.is_queen_side_castle = True
                     moves.append(move)
 
-    def generate_slider_moves(self, moves: list):
+    def generate_slider_moves(self, moves: list[Move]) -> None:
         rook = 'R' if self.board.turn == 'w' else 'r'
         queen = 'Q' if self.board.turn == 'w' else 'q'
         bishop = 'B' if self.board.turn == 'w' else 'b'
@@ -126,7 +127,7 @@ class MoveGeneration:
                 diagonal_moves, target_index = BBU.popLSB(diagonal_moves)
                 moves.append(Move(start_index, target_index))
     
-    def generate_knight_moves(self, moves: list):
+    def generate_knight_moves(self, moves: list[Move]) -> None:
         knights = self.board.bitboard_dict['N'] if self.board.turn == 'w' else self.board.bitboard_dict['n']
         knights &= ~self.pin_rays
         
@@ -143,16 +144,21 @@ class MoveGeneration:
                 knight_moves, target_index = BBU.popLSB(knight_moves)
                 moves.append(Move(start_index, target_index))
 
-    def generate_pawn_moves(self, moves: list):
+    def generate_pawn_moves(self, moves: list[Move]) -> None:
         dir = 1 if self.board.turn == 'w' else -1
         push_offset = dir * 8
         pawns_bb = self.board.bitboard_dict['P'] if self.board.turn == 'w' else self.board.bitboard_dict['p']
         empty_sq = ~self.board.occupied
         promotion_rank = BBU.RANKS[7] if self.board.turn == 'w' else BBU.RANKS[0]
-        double_push_rank = BBU.RANKS[4] if self.board == 'w' else BBU.RANKS[3]
+        double_push_rank = BBU.RANKS[3] if self.board.turn == 'w' else BBU.RANKS[4]
 
-        single_push = pawns_bb << np.uint64(push_offset) & empty_sq
-        double_push = single_push << np.uint64(push_offset) & empty_sq & double_push_rank
+        if self.board.turn == 'w':
+            single_push = pawns_bb << np.uint64(push_offset) & empty_sq
+            double_push = single_push << np.uint64(push_offset) & empty_sq & double_push_rank
+        else:
+            single_push = pawns_bb >> np.uint64(-push_offset) & empty_sq
+            double_push = single_push >> np.uint64(-push_offset) & empty_sq & double_push_rank
+
         captures_left = self.attack_data.generate_pawn_attacks_left(self.board.turn, pawns_bb) & self.enemy_pieces_bb
         captures_right = self.attack_data.generate_pawn_attacks_right(self.board.turn, pawns_bb) & self.enemy_pieces_bb
 
@@ -192,14 +198,14 @@ class MoveGeneration:
         # Captures
         while captures_left != 0:
             captures_left, target_index = BBU.popLSB(captures_left)
-            start_index = target_index - dir*7
+            start_index = target_index - dir*9 if self.board.turn == 'w' else target_index - dir*7
             
             if not self.is_pinned(start_index) or self.is_aligned(start_index, target_index):
                 moves.append(Move(start_index, target_index))
         
         while captures_right != 0:
             captures_right, target_index = BBU.popLSB(captures_right)
-            start_index = target_index - dir*9
+            start_index = target_index - dir*7 if self.board.turn == 'w' else target_index - dir*9
             
             if not self.is_pinned(start_index) or self.is_aligned(start_index, target_index):
                 moves.append(Move(start_index, target_index))
@@ -214,30 +220,25 @@ class MoveGeneration:
         
         while captures_left_promo != 0:
             captures_left_promo, target_index = BBU.popLSB(captures_left_promo)
-            start_index = target_index - push_offset
+            start_index = target_index - dir*9 if self.board.turn == 'w' else target_index - dir*7
             
             if not self.is_pinned(start_index) or self.is_aligned(start_index, target_index):
                 self.generate_promotions(start_index, target_index, moves)
         
         while captures_right_promo != 0:
             captures_right_promo, target_index = BBU.popLSB(captures_right_promo)
-            start_index = target_index - push_offset
+            start_index = target_index - dir*7 if self.board.turn == 'w' else target_index - dir*9
             
             if not self.is_pinned(start_index) or self.is_aligned(start_index, target_index):
                 self.generate_promotions(start_index, target_index, moves)
         
         # En passant
-        if self.board.current_game_state.enpassant_pos is not None:
-            target_rank = self.board.current_game_state.enpassant_pos[0]
-            target_file = self.board.current_game_state.enpassant_pos[1]
-            target_index = self.calculate_index(target_rank, target_file)
+        if self.board.current_game_state.enpassant_index is not None:
+            target_index = self.board.current_game_state.enpassant_index
             captured_pawn_index = target_index - push_offset
 
             if not self.in_check or BBU.contains_square(self.check_ray_mask, captured_pawn_index):
-                enp_pawns = pawns_bb & self.attack_data.generate_pawn_attatcks('w' if self.board.turn == 'b' else 'b', BBU.set_square(np.uint64(0), target_index))
-                BBU.printBB(self.attack_data.generate_pawn_attatcks('w' if self.board.turn == 'b' else 'b', BBU.set_square(np.uint64(0), target_index)))
-                print()
-                BBU.printBB(pawns_bb)
+                enp_pawns = pawns_bb & self.attack_data.generate_pawn_attacks('w' if self.board.turn == 'b' else 'b', BBU.set_square(np.uint64(0), target_index))
 
                 while enp_pawns:
                     enp_pawns, start_index = BBU.popLSB(enp_pawns)
@@ -245,34 +246,35 @@ class MoveGeneration:
                         not self.in_check_after_enpassant(start_index, target_index, captured_pawn_index):
                         move = Move(start_index, target_index)
                         move.is_enpassant = True
-                        move.enpassant_pawn = captured_pawn_index
+                        move.enpassant_pawn_index = self.board.current_game_state.enpassant_index
                         moves.append(move)
 
         return moves
     
     # Generates pawn promotion moves
-    def generate_promotions(self, start_index: int, target_index: int, moves: list):
+    def generate_promotions(self, start_index: int, target_index: int, moves: list[Move]) -> None:
         promotion_pieces = ['N', 'B', 'R', 'Q']
 
         for piece in promotion_pieces:
             piece = piece.lower() if self.board.turn == 'b' else piece
             promotion_move = Move(start_index, target_index)
             promotion_move.promoted_piece = piece
+            promotion_move.is_promotion = True
             moves.append(promotion_move)
 
     # Goes through each attacks from opposition to look for checks and pin rays
-    def iterate_opposing_attacks(self):
+    def iterate_opposing_attacks(self) -> None:
         self.in_check = False
         self.in_double_check = False
         
         attack_map = np.uint64(0)
 
-        for pos, piece in self.enemy_pieces.items():
-            x, y = pos[0], pos[1]
-            index = self.calculate_index(x, y)
-            attacks = self.get_piece_attack(piece, index)
+        for index, piece in self.enemy_pieces.items():
+            x = index % 8
+            y = index // 8
+            attacks = self.get_piece_attack(piece, index, is_enemy=True)
             # AND out allied pieces of opposition
-            attacks &= ~(attacks & self.enemy_pieces_bb)
+            #attacks &= ~(attacks & self.enemy_pieces_bb)
             attack_map |= attacks
 
             is_slider = piece.lower() == 'r' or piece.lower() == 'b' or piece.lower() == 'q'
@@ -287,7 +289,7 @@ class MoveGeneration:
                     self.in_check = True
                 
                 # Legal mask includes capturing the attacking piece
-                BBU.set_square(self.check_ray_mask, index)
+                self.check_ray_mask = BBU.set_square(self.check_ray_mask, index)
             
             # Check for possible pins and check rays
             if is_orthogonal:
@@ -302,14 +304,18 @@ class MoveGeneration:
                 if self.ally_king_pos[0] + self.ally_king_pos[1] == x + y or \
                     self.ally_king_pos[0] - self.ally_king_pos[1] == x - y:
                     self.check_pins(x, y, is_diagonal=True)
-            
+        
         self.enemy_attack_map |= attack_map
     
     # Gets precomputed attacks for piece
-    def get_piece_attack(self, piece: str, index: int) -> np.uint64:
+    def get_piece_attack(self, piece: str, index: int, is_enemy=False) -> np.uint64:
         attacks = np.uint64(0)
         x = index % 8
         y = index // 8
+        occupied = self.board.occupied & ~(self.ally_king_bb) if is_enemy else self.board.occupied
+        occupied90 = self.board.occupied90 & ~(BBU.rotate_mirrored90c(self.ally_king_bb)) if is_enemy else self.board.occupied90
+        occupied45L = self.board.occupied45L & ~(BBU.rotate45(self.ally_king_bb, is_right=False)) if is_enemy else self.board.occupied45L
+        occupied45R = self.board.occupied45R & ~(BBU.rotate45(self.ally_king_bb)) if is_enemy else self.board.occupied45R
         
         if piece == 'p':
             attacks = self.attack_data.black_pawn_attacks[index]
@@ -320,18 +326,18 @@ class MoveGeneration:
         elif piece.lower() == 'k':
             attacks = self.attack_data.king_moves[index]
         elif piece.lower() == 'r':
-            rank_attacks = self.attack_data.rank_attacks[index][self.board.occupied >> np.uint64(y*8) & np.uint64(255)]
-            file_attacks = self.attack_data.file_attacks[index][self.board.occupied90 >> np.uint64(x*8) & np.uint64(255)]
+            rank_attacks = self.attack_data.rank_attacks[index][occupied >> np.uint64(y*8) & np.uint64(255)]
+            file_attacks = self.attack_data.file_attacks[index][occupied90 >> np.uint64(x*8) & np.uint64(255)]
             attacks = rank_attacks | file_attacks
         elif piece.lower() == 'b':
-            right_diagonal_attacks = self.attack_data.diagR_attacks[index][self.board.occupied45R >> self.diag_to_shift[7-x+y] & np.uint64(2**(self.diag_lengths[abs(x-y)])-1)]
-            left_diagonal_attacks = self.attack_data.diagL_attacks[index][self.board.occupied45L >> self.diag_to_shift[14-x-y] & np.uint64(2**(self.diag_lengths[abs(7-x-y)])-1)]
+            right_diagonal_attacks = self.attack_data.diagR_attacks[index][occupied45R >> self.diag_to_shift[7-x+y] & np.uint64(2**(self.diag_lengths[abs(x-y)])-1)]
+            left_diagonal_attacks = self.attack_data.diagL_attacks[index][occupied45L >> self.diag_to_shift[14-x-y] & np.uint64(2**(self.diag_lengths[abs(7-x-y)])-1)]
             attacks = right_diagonal_attacks | left_diagonal_attacks
         elif piece.lower() == 'q': 
-            rank_attacks = self.attack_data.rank_attacks[index][self.board.occupied >> np.uint64(y*8) & np.uint64(255)]
-            file_attacks = self.attack_data.file_attacks[index][self.board.occupied90 >> np.uint64(x*8) & np.uint64(255)]
-            right_diagonal_attacks = self.attack_data.diagR_attacks[index][self.board.occupied45R >> self.diag_to_shift[7-x+y] & np.uint64(2**(self.diag_lengths[abs(x-y)])-1)]
-            left_diagonal_attacks = self.attack_data.diagL_attacks[index][self.board.occupied45L >> self.diag_to_shift[14-x-y] & np.uint64(2**(self.diag_lengths[abs(7-x-y)])-1)]
+            rank_attacks = self.attack_data.rank_attacks[index][occupied >> np.uint64(y*8) & np.uint64(255)]
+            file_attacks = self.attack_data.file_attacks[index][occupied90 >> np.uint64(x*8) & np.uint64(255)]
+            right_diagonal_attacks = self.attack_data.diagR_attacks[index][occupied45R >> self.diag_to_shift[7-x+y] & np.uint64(2**(self.diag_lengths[abs(x-y)])-1)]
+            left_diagonal_attacks = self.attack_data.diagL_attacks[index][occupied45L >> self.diag_to_shift[14-x-y] & np.uint64(2**(self.diag_lengths[abs(7-x-y)])-1)]
             attacks = rank_attacks | file_attacks | right_diagonal_attacks | left_diagonal_attacks
 
         return attacks
@@ -354,7 +360,7 @@ class MoveGeneration:
             
             if index == self.ally_king_index:
                 # This means the King is being attacked and in check
-                if not is_pinned:
+                if not is_pinned and self.in_check:
                     self.check_ray_mask |= ray_mask
                     break
                 else:
@@ -363,10 +369,13 @@ class MoveGeneration:
             elif BBU.contains_square(self.ally_pieces_bb, index):
                 if not is_pinned: 
                     is_pinned = True
+
                 else:
+                    is_pinned = False
                     break
             
             elif BBU.contains_square(self.enemy_pieces_bb, index) and index != self.calculate_index(x, y):
+                is_pinned = False
                 break
         
         if is_pinned:
@@ -376,7 +385,7 @@ class MoveGeneration:
         return BBU.contains_square(self.pin_rays, index)
     
     def is_aligned(self, index1, index2):
-        return self.attack_data.align_mask[index1][self.ally_king_bb] == self.attack_data.align_mask[index2][self.ally_king_bb]
+        return self.attack_data.align_mask[index1][self.ally_king_index] == self.attack_data.align_mask[index2][self.ally_king_index]
     
     def in_check_after_enpassant(self, start_index, target_index, enp_capture_index):
         rook = 'R' if self.board.turn == 'b' else 'r'
@@ -395,8 +404,6 @@ class MoveGeneration:
         
         return False
 
-
-    
     def valid_square_index(self, x: int, y: int) -> bool:
         return x >= 0 and x < 8 and y >= 0 and y < 8
     

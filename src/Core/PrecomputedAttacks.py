@@ -224,7 +224,7 @@ class PrecomputedAttacks:
         else:
             return (pawn_map >> np.uint64(9)) & ~BBU.FILES[7]
     
-    def generate_pawn_attatcks(self, color, pawn_map):
+    def generate_pawn_attacks(self, color, pawn_map):
         return self.generate_pawn_attacks_left(color, pawn_map) | self.generate_pawn_attacks_right(color, pawn_map)
 
     def valid_square_index(self, x, y):

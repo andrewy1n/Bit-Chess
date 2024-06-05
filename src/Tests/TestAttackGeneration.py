@@ -163,6 +163,23 @@ class TestAttackGeneration(unittest.TestCase):
       print()
 
       self.assertEqual(right_diagonal | left_diagonal, moves)
+   
+   def test_diagonal(self):
+      diag_lengths = [8, 7, 6, 5, 4, 3, 2, 1]
+      sample_blockers = BBU.set_square_notation(np.uint64(0), [('a', 5)])
+
+      moves = BBU.set_square_notation(np.uint64(0), [('e', 1), ('d', 2), ('c', 3), ('b', 4), ('b', 6), ('c', 7), ('d', 8)])
+
+      x, y = 0, 4
+
+      right_diagonal = attack_generator.diagR_attacks[32][BBU.rotate45(sample_blockers) >> attack_generator.diag_to_shift[7-x+y] & np.uint64(2**(diag_lengths[abs(x-y)])-1)]
+      left_diagonal = attack_generator.diagL_attacks[32][BBU.rotate45(sample_blockers, is_right=False) >> attack_generator.diag_to_shift[14-x-y] & np.uint64(2**(diag_lengths[abs(7-x-y)])-1)]
+      BBU.printBB(right_diagonal | left_diagonal)
+      print()
+
+      self.assertEqual(right_diagonal | left_diagonal, moves)
+
+
 
 if __name__ == '__main__':
    unittest.main()
