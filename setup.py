@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='bit-chess-python',
-    version='0.1.0',
+    version='0.1.1',
     author='Andrew Yin',
     author_email='andrewyingo@gmail.com',
     description='Bitboard Chess implementation written entirely in Python',
