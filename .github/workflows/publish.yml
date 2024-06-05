@@ -44,7 +44,7 @@ jobs:
           TWINE_USERNAME: "__token__"
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          python -m twine upload dist/*
+          python -m twine upload dist/* --skip-existing
 
       - name: Commit and push version bump
         run: |
