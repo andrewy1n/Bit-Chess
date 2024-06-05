@@ -2,7 +2,6 @@ from src.Core.Board import Board
 from src.Core.MoveGeneration import MoveGeneration
 from src.Core.PrecomputedAttacks import PrecomputedAttacks
 from src.Core.Move import Move
-from src.Core import BitboardUtility as BBU 
 
 def main():
     board = Board()
