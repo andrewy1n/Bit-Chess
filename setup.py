@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 setup(
-    name='bit-chess',
+    name='bit-chess-python',
     version='0.1.0',
     author='Andrew Yin',
     author_email='andrewyingo@gmail.com',
