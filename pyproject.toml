@@ -18,6 +18,9 @@ dynamic = ["version", "dependencies"]
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
+[tool.poetry]
+readme = "README.md"
+
 [project.urls]
 Homepage = "https://github.com/andrewy1n/Bit-Chess"
 Repository = "https://github.com/andrewy1n/Bit-Chess"
