@@ -1,5 +1,5 @@
 import unittest
-from src.Core.Perft import Perft
+from src.BitChess.Perft import Perft
 
 class TestPERFT(unittest.TestCase):
     def test_default_pos(self):

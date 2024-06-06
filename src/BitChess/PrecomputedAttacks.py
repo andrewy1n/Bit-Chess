@@ -1,6 +1,6 @@
 import numpy as np
 import math
-from src.Core import BitboardUtility as BBU
+from src.BitChess import BitboardUtility as BBU
 
 '''
 Generates Precomputed Attacks for Opposing Players

@@ -35,7 +35,9 @@ pip install bit-chess-python
 If you want to run PERFT, import the PERFT class and call the perft function:
 
 ```
-from 
+from BitChess import Perft
+perft = Perft(FEN_string)
+perft.perft(1)
 ```
 
 ## Built Using <a name = "built_using"></a>

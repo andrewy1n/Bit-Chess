@@ -1,8 +1,8 @@
 import unittest
-from src.Core.Board import Board
-from src.Core.MoveGeneration import MoveGeneration
-from src.Core.PrecomputedAttacks import PrecomputedAttacks
-from src.Core import BitboardUtility as BBU  
+from src.BitChess.Board import Board
+from src.BitChess.MoveGeneration import MoveGeneration
+from src.BitChess.PrecomputedAttacks import PrecomputedAttacks
+from src.BitChess import BitboardUtility as BBU  
 import numpy as np
 
 attacks = PrecomputedAttacks()

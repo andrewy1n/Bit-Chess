@@ -1,7 +1,7 @@
-from src.Core.Board import Board
-from src.Core.MoveGeneration import MoveGeneration
-from src.Core.PrecomputedAttacks import PrecomputedAttacks
-from src.Core.Move import Move
+from src.BitChess.Board import Board
+from src.BitChess.MoveGeneration import MoveGeneration
+from src.BitChess.PrecomputedAttacks import PrecomputedAttacks
+from src.BitChess.Move import Move
 
 def main():
     board = Board()

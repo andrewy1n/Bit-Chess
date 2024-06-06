@@ -1,8 +1,8 @@
 import numpy as np
-from src.Core import BitboardUtility as BBU
-from src.Core.Move import Move
-from src.Core.PrecomputedAttacks import PrecomputedAttacks
-from src.Core.Board import Board 
+from src.BitChess import BitboardUtility as BBU
+from src.BitChess.Move import Move
+from src.BitChess.PrecomputedAttacks import PrecomputedAttacks
+from src.BitChess.Board import Board 
 
 class MoveGeneration:
     def __init__(self, board: Board, attack_data: PrecomputedAttacks) -> None:

@@ -1,7 +1,7 @@
-from src.Core import BitboardUtility as BBU
-from src.Core.Move import Move
-from src.Core.GameState import GameState
-from src.Core.PieceList import PieceList
+from src.BitChess import BitboardUtility as BBU
+from src.BitChess.Move import Move
+from src.BitChess.GameState import GameState
+from src.BitChess.PieceList import PieceList
 import numpy as np
 
 class Board:
