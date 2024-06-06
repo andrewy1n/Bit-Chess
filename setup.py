@@ -1,11 +1,8 @@
 from setuptools import setup, find_packages
 
-with open("VERSION", "r") as fh:
-    version = fh.read().strip()
-
 setup(
     name='bit-chess-python',
-    version=version,
+    version="0.1.1",
     author='Andrew Yin',
     author_email='andrewyingo@gmail.com',
     description='Bitboard Chess implementation written entirely in Python',
